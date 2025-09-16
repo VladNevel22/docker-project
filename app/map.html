@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+	<head>
+		<meta charset="UTF-8" />
+		<title>OpenLayers простой пример</title>
+		<link
+			rel="stylesheet"
+			href="https://cdn.jsdelivr.net/npm/ol@7.4.0/dist/ol.css"
+		/>
+		<style>
+			#map {
+				width: 100%;
+				height: 100vh;
+			}
+			.ol-popup {
+				position: absolute;
+				background: white;
+				padding: 5px;
+				border: 1px solid black;
+				bottom: 12px;
+				left: -50px;
+				min-width: 150px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="map"></div>
+		<div id="popup" class="ol-popup"></div>
+
+		<script src="https://cdn.jsdelivr.net/npm/ol@7.4.0/dist/ol.js"></script>
+		<script>
+			const vectorSource = new ol.source.Vector()
+
+			fetch('locations.geojson')
+				.then(res => res.json())
+				.then(data => {
+					// Преобразуем GeoJSON в объекты OpenLayers
+					const features = new ol.format.GeoJSON().readFeatures(data, {
+						dataProjection: 'EPSG:4326', // координаты в файле
+						featureProjection: 'EPSG:3857', // для карты
+					})
+					vectorSource.addFeatures(features)
+				})
+				.catch(err => console.error('Ошибка загрузки GeoJSON:', err))
+
+			// Слой для точек
+			const vectorLayer = new ol.layer.Vector({
+				source: vectorSource,
+				style: new ol.style.Style({
+					image: new ol.style.Circle({
+						radius: 6,
+						fill: new ol.style.Fill({ color: 'red' }),
+						stroke: new ol.style.Stroke({ color: 'white', width: 2 }),
+					}),
+				}),
+			})
+
+			// Карта
+			const map = new ol.Map({
+				target: 'map',
+				layers: [
+					new ol.layer.Tile({ source: new ol.source.OSM() }),
+					vectorLayer,
+				],
+				view: new ol.View({
+					center: ol.proj.fromLonLat([37.618423, 55.751244]),
+					zoom: 5,
+				}),
+			})
+
+			// Popup
+			const popup = new ol.Overlay({
+				element: document.getElementById('popup'),
+				positioning: 'bottom-center',
+				stopEvent: false,
+			})
+			map.addOverlay(popup)
+
+			// При клике на точку
+			map.on('singleclick', function (evt) {
+				const feature = map.forEachFeatureAtPixel(evt.pixel, f => f)
+				if (feature) {
+					const props = feature.getProperties()
+					popup.setPosition(evt.coordinate)
+					document.getElementById('popup').innerHTML = `
+        <b>${props.city_name}</b><br>
+        Регион: ${props.region}<br>
+        FIAS ID: ${props.fias_id}
+      `
+				} else {
+					popup.setPosition(undefined)
+				}
+			})
+		</script>
+	</body>
+</html>
